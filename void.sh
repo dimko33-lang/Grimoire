@@ -322,8 +322,12 @@ def chat():
         try:
             messages = conversation_history if memory_enabled else [{"role": "user", "content": user_msg}]
             for chunk in agent.chat_stream(messages):
-                full_response += chunk
-                yield chunk
+                try:
+                    clean_chunk = chunk.encode('latin-1').decode('utf-8')
+                except:
+                    clean_chunk = chunk
+                full_response += clean_chunk
+                yield clean_chunk
             if '[CMD]' in full_response or '[CSS]' in full_response:
                 full_response, css_changed = parse_and_execute_tools(full_response)
             conversation_history.append({"role": "assistant", "content": full_response})
