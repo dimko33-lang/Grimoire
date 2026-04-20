@@ -57,9 +57,14 @@ class VoidAgent:
         self.url = "https://api.moonshot.ai/v1/chat/completions"
         self.timeout = 120
 
-    def _call_llm_stream(self, messages):
+    def _call_llm_stream(self, messages, thinking_enabled=False):
         headers = {"Authorization": f"Bearer {self.api_key}", "Content-Type": "application/json"}
-        payload = {"model": self.model, "messages": messages, "stream": True}
+        payload = {
+            "model": self.model,
+            "messages": messages,
+            "stream": True,
+            "thinking": {"type": "enabled"} if thinking_enabled else {"type": "disabled"}
+        }
         resp = requests.post(self.url, headers=headers, json=payload, timeout=self.timeout, stream=True)
         resp.raise_for_status()
         for line in resp.iter_lines(decode_unicode=True):
@@ -76,8 +81,8 @@ class VoidAgent:
                 except:
                     continue
 
-    def chat_stream(self, messages):
-        yield from self._call_llm_stream(messages)
+    def chat_stream(self, messages, thinking_enabled=False):
+        yield from self._call_llm_stream(messages, thinking_enabled)
 
 agent = VoidAgent()
 app = Flask(__name__)
@@ -308,7 +313,7 @@ def handle_command():
 
 @app.route('/chat', methods=['POST'])
 def chat():
-    global conversation_history
+    global conversation_history, thinking_enabled
     data = request.get_json()
     user_msg = data.get('message', '').strip()
     if not user_msg: return jsonify({'error': 'empty'}), 400
@@ -321,7 +326,7 @@ def chat():
         css_changed = False
         try:
             messages = conversation_history if memory_enabled else [{"role": "user", "content": user_msg}]
-            for chunk in agent.chat_stream(messages):
+            for chunk in agent.chat_stream(messages, thinking_enabled):
                 try:
                     clean_chunk = chunk.encode('latin-1').decode('utf-8')
                 except:
